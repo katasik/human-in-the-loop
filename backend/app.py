@@ -48,7 +48,7 @@ from prompts import (
 GUIDE_VOICE_ID = "24EI9FmmGvJruwUi7TJM"
 CHALLENGER_VOICE_ID = "yM93hbw8Qtvdma2wCnJG"
 
-OLLAMA_MODEL = "llama3.2"  # change if you pulled another model name
+OLLAMA_MODEL = "llama3.2:1b"
 
 # ------------------------
 # LLM helper (Ollama)
@@ -57,27 +57,29 @@ OLLAMA_MODEL = "llama3.2"  # change if you pulled another model name
 
 def llm_chat(system_prompt: str, user_text: str) -> str:
     """
-    Call local Ollama chat API with a system + user message.
-
-    Assumes:
-    - Ollama is running on http://localhost:11434
-    - A model named OLLAMA_MODEL is available (via `ollama pull <model>`).
+    Call local Ollama via /api/generate using a single prompt
+    that includes the system instruction and the user text.
+    Works even on Ollama versions without /api/chat.
     """
-    url = "http://localhost:11434/api/chat"
+    url = "http://localhost:11434/api/generate"
+
+    prompt = (
+        f"{system_prompt.strip()}\n\n"
+        f"User: {user_text.strip()}\n\n"
+        f"Assistant:"
+    )
+
     payload = {
         "model": OLLAMA_MODEL,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_text},
-        ],
+        "prompt": prompt,
         "stream": False,
     }
+
     resp = requests.post(url, json=payload)
     resp.raise_for_status()
     data = resp.json()
-    # Ollama returns: {"message": {"role": "...", "content": "..."}, ...}
-    return data["message"]["content"].strip()
-
+    # /api/generate returns: {"response": "...", ...}
+    return data["response"].strip()
 
 # ------------------------
 # ElevenLabs TTS helper
