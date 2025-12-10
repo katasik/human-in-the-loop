@@ -20,37 +20,9 @@ let lastUserText = "";
 let lastGuideText = "";
 let lastChallengerText = "";
 
-// ---- Speech synthesis (for Guide & Challenger) ----
-
-let voices = [];
-let guideVoice = null;
-let challengerVoice = null;
-
-function loadVoices() {
-  voices = window.speechSynthesis.getVoices();
-
-  if (voices.length > 0) {
-    guideVoice = voices[0];
-    challengerVoice = voices[Math.min(1, voices.length - 1)];
-  }
-}
-
-if ("speechSynthesis" in window) {
-  window.speechSynthesis.onvoiceschanged = loadVoices;
-  loadVoices();
-}
-
-function speak(text, voice) {
-  if (!("speechSynthesis" in window)) {
-    alert("Speech synthesis not supported in this browser.");
-    return;
-  }
-  if (!text) return;
-  const utterance = new SpeechSynthesisUtterance(text);
-  if (voice) utterance.voice = voice;
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(utterance);
-}
+// Store latest audio URLs from backend
+let guideAudioUrl = null;
+let challengerAudioUrl = null;
 
 // ---- Speech recognition (mic → text) ----
 
@@ -79,7 +51,6 @@ if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
 
 micBtn.addEventListener("click", () => {
   if (!recognition) return;
-  window.speechSynthesis.cancel(); // stop any speaking
   recognition.start();
   micBtn.textContent = "🎙️ Listening...";
   recognition.onend = () => {
@@ -87,7 +58,18 @@ micBtn.addEventListener("click", () => {
   };
 });
 
-// ---- Call /api/ensemble (single-turn v1) ----
+// ---- Helper: play ElevenLabs audio ----
+
+function playAudio(url) {
+  if (!url) {
+    alert("No audio available yet – run the Ensemble first.");
+    return;
+  }
+  const audio = new Audio(url);
+  audio.play();
+}
+
+// ---- Call /api/ensemble ----
 
 runBtn.addEventListener("click", async () => {
   const text = inputEl.value.trim();
@@ -116,12 +98,18 @@ runBtn.addEventListener("click", async () => {
     const guide = data.guide_text;
     const challenger = data.challenger_text;
 
+    // Save last texts for summary
     lastUserText = text;
     lastGuideText = guide;
     lastChallengerText = challenger;
 
+    // Set texts on UI
     guideTextEl.textContent = guide;
     challengerTextEl.textContent = challenger;
+
+    // Build full URLs for audio (backend returns paths like "/audio/xxxx.mp3")
+    guideAudioUrl = apiBase + data.guide_audio_url;
+    challengerAudioUrl = apiBase + data.challenger_audio_url;
 
     agentsBox.style.display = "grid";
     summaryBtn.disabled = false;
@@ -176,12 +164,12 @@ summaryBtn.addEventListener("click", async () => {
   }
 });
 
-// ---- Voice playback buttons ----
+// ---- Voice playback buttons (now using ElevenLabs audio) ----
 
 guideSpeakBtn.addEventListener("click", () => {
-  speak(guideTextEl.textContent, guideVoice);
+  playAudio(guideAudioUrl);
 });
 
 challengerSpeakBtn.addEventListener("click", () => {
-  speak(challengerTextEl.textContent, challengerVoice);
+  playAudio(challengerAudioUrl);
 });
