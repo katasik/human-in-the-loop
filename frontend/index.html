@@ -1,112 +1,426 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>The Ensemble – Work–Life Podcast</title>
+  <meta charset="UTF-8" />
+  <title>The Inner Council – Three Voices</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
   <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --intuition-color: #60a5fa;
+      --intuition-glow: rgba(96, 165, 250, 0.3);
+      --reason-color: #a78bfa;
+      --reason-glow: rgba(167, 139, 250, 0.3);
+      --fear-color: #fbbf24;
+      --fear-glow: rgba(251, 191, 36, 0.3);
+      --bg-dark: #0f172a;
+      --bg-card: #1e293b;
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --border-color: #334155;
+    }
+
     body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-      max-width: 800px;
-      margin: 40px auto;
-      padding: 0 16px 40px;
-      background: #fafafa;
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+        sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: var(--text-primary);
+      min-height: 100vh;
+      line-height: 1.6;
     }
-    h1 {
-      margin-bottom: 0.25rem;
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem 1rem 3rem;
     }
-    h2 {
-      margin-top: 2rem;
+
+    .header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+      padding: 2rem 0 1rem;
     }
-    p {
-      line-height: 1.5;
+
+    .title {
+      font-size: 2.6rem;
+      font-weight: 700;
+      background: linear-gradient(
+        135deg,
+        var(--intuition-color),
+        var(--reason-color),
+        var(--fear-color)
+      );
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.4rem;
     }
-    textarea {
+
+    .subtitle {
+      font-size: 1.05rem;
+      color: var(--text-secondary);
+    }
+
+    .input-card {
+      background: var(--bg-card);
+      border-radius: 1rem;
+      padding: 2rem;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+      margin-bottom: 2.5rem;
+    }
+
+    .input-label {
+      display: block;
+      font-size: 1.05rem;
+      font-weight: 500;
+      margin-bottom: 0.75rem;
+    }
+
+    .challenge-input {
       width: 100%;
-      min-height: 120px;
-      padding: 8px;
-      border-radius: 6px;
-      border: 1px solid #ccc;
-      resize: vertical;
+      padding: 0.9rem;
+      font-size: 0.98rem;
       font-family: inherit;
+      background: var(--bg-dark);
+      color: var(--text-primary);
+      border: 2px solid var(--border-color);
+      border-radius: 0.5rem;
+      resize: vertical;
+      min-height: 100px;
+      transition: border-color 0.2s;
     }
-    button {
-      margin-top: 12px;
-      padding: 8px 16px;
+
+    .challenge-input:focus {
+      outline: none;
+      border-color: var(--intuition-color);
+    }
+
+    .buttons-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 1rem;
+      align-items: center;
+    }
+
+    .primary-btn,
+    .secondary-btn {
+      padding: 0.7rem 1.4rem;
       border-radius: 999px;
       border: none;
       cursor: pointer;
-      background: #111827;
-      color: white;
       font-size: 0.95rem;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
     }
-    button[disabled] {
-      opacity: 0.6;
+
+    .primary-btn {
+      background: linear-gradient(
+        135deg,
+        var(--intuition-color),
+        var(--reason-color)
+      );
+      color: white;
+    }
+
+    .primary-btn:disabled {
+      opacity: 0.65;
       cursor: wait;
     }
+
     .secondary-btn {
       background: #e5e7eb;
       color: #111827;
-      margin-left: 8px;
     }
-    #podcastContainer {
-      margin-top: 24px;
-      display: none;
+
+    .demo-note {
+      margin-top: 0.5rem;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
     }
-    .turn {
-      background: white;
-      border-radius: 12px;
-      padding: 12px 14px;
-      border: 1px solid #e5e7eb;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
-      margin-bottom: 12px;
+
+    .council-members {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 1.4rem;
+      margin-bottom: 2rem;
     }
-    .turn-header {
+
+    .voice-card {
+      background: var(--bg-card);
+      border-radius: 1rem;
+      padding: 1.4rem;
+      border: 2px solid var(--border-color);
+      text-align: center;
+      transition: transform 0.3s, border-color 0.3s, box-shadow 0.3s;
+    }
+
+    .voice-card.speaking {
+      transform: scale(1.04);
+    }
+
+    .voice-card[data-voice="Intuition"].speaking {
+      border-color: var(--intuition-color);
+      box-shadow: 0 0 25px var(--intuition-glow);
+    }
+
+    .voice-card[data-voice="Reason"].speaking {
+      border-color: var(--reason-color);
+      box-shadow: 0 0 25px var(--reason-glow);
+    }
+
+    .voice-card[data-voice="Fear"].speaking {
+      border-color: var(--fear-color);
+      box-shadow: 0 0 25px var(--fear-glow);
+    }
+
+    .voice-avatar {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 0.8rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.5rem;
+      position: relative;
+      border: 3px solid var(--border-color);
+    }
+
+    .intuition-avatar {
+      background: linear-gradient(135deg, var(--intuition-color), #3b82f6);
+    }
+
+    .reason-avatar {
+      background: linear-gradient(135deg, var(--reason-color), #8b5cf6);
+    }
+
+    .fear-avatar {
+      background: linear-gradient(135deg, var(--fear-color), #f59e0b);
+    }
+
+    .speaking-indicator {
+      position: absolute;
+      top: -5px;
+      right: -5px;
+      width: 18px;
+      height: 18px;
+      background: #10b981;
+      border-radius: 50%;
+      border: 3px solid var(--bg-card);
+      opacity: 0;
+      transition: opacity 0.25s;
+    }
+
+    .voice-card.speaking .speaking-indicator {
+      opacity: 1;
+    }
+
+    .voice-name {
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .voice-role {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+
+    .dialogue-card {
+      background: var(--bg-card);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      border: 1px solid var(--border-color);
+      min-height: 280px;
+      max-height: 520px;
+      overflow-y: auto;
+    }
+
+    .dialogue-message {
+      margin-bottom: 1.1rem;
+      padding: 1rem;
+      border-radius: 0.75rem;
+      border-left: 4px solid;
+      opacity: 0;
+      animation: fadeInUp 0.4s ease-out forwards;
+    }
+
+    .dialogue-message.Intuition {
+      background: linear-gradient(
+        135deg,
+        rgba(96, 165, 250, 0.12),
+        rgba(59, 130, 246, 0.06)
+      );
+      border-left-color: var(--intuition-color);
+    }
+
+    .dialogue-message.Reason {
+      background: linear-gradient(
+        135deg,
+        rgba(167, 139, 250, 0.12),
+        rgba(139, 92, 246, 0.06)
+      );
+      border-left-color: var(--reason-color);
+    }
+
+    .dialogue-message.Fear {
+      background: linear-gradient(
+        135deg,
+        rgba(251, 191, 36, 0.14),
+        rgba(245, 158, 11, 0.08)
+      );
+      border-left-color: var(--fear-color);
+    }
+
+    @keyframes fadeInUp {
+      from {
+        transform: translateY(8px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .message-header {
+      font-weight: 600;
+      margin-bottom: 0.4rem;
+    }
+
+    .message-text {
+      font-size: 0.96rem;
+    }
+
+    .playback-row {
+      margin-top: 1rem;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 6px;
+      gap: 0.75rem;
+      flex-wrap: wrap;
     }
+
     .pill {
-      display: inline-block;
-      padding: 2px 8px;
+      padding: 0.18rem 0.6rem;
       border-radius: 999px;
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      background: #eef2ff;
-      color: #4338ca;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--border-color);
+      font-size: 0.78rem;
+      color: var(--text-secondary);
     }
-    .pill.challenger {
-      background: #fef3c7;
-      color: #9a3412;
-    }
-    .turn p {
-      margin: 0;
-      white-space: pre-wrap;
-    }
-    .small-btn {
-      border-radius: 999px;
-      padding: 4px 10px;
+
+    .footer {
+      margin-top: 2.5rem;
+      text-align: center;
+      color: var(--text-secondary);
       font-size: 0.8rem;
+    }
+
+    @media (max-width: 768px) {
+      .title {
+        font-size: 2.1rem;
+      }
+      .dialogue-card {
+        min-height: 240px;
+      }
     }
   </style>
 </head>
 <body>
-  <h1>The Ensemble – Work–Life Podcast</h1>
-  <p>
-    Describe your current work–life challenge. Then listen as two friends –
-    a warm Guide and a rational Challenger – talk it through from different perspectives.
-  </p>
+  <div class="container">
+    <header class="header">
+      <h1 class="title">The Inner Council</h1>
+      <p class="subtitle">
+        Three inner voices – Intuition, Reason, and Fear – debate your challenge while you listen.
+      </p>
+    </header>
 
-  <textarea id="input" placeholder="E.g., I feel like I'm always working late and I have no energy left for anything else."></textarea>
-  <br>
-  <button id="podcastBtn">Let them talk it out</button>
-  <button id="micBtn" class="secondary-btn">🎙️ Speak instead of typing</button>
+    <section class="input-section">
+      <div class="input-card">
+        <label for="challengeInput" class="input-label">
+          What challenge are you facing right now?
+        </label>
+        <textarea
+          id="challengeInput"
+          class="challenge-input"
+          placeholder="E.g., I'm considering leaving my stable job for something more meaningful but I'm scared about money and regret."
+        ></textarea>
 
-  <div id="podcastContainer">
-    <h2>Their conversation about your situation</h2>
-    <button id="playAllBtn" class="secondary-btn">🔊 Play full conversation</button>
-    <div id="turns"></div>
+        <div class="buttons-row">
+          <button id="startButton" class="primary-btn">
+            <span class="button-text">Let the Inner Council speak</span>
+          </button>
+          <button id="micButton" class="secondary-btn">
+            🎙️ Speak instead of typing
+          </button>
+          <span class="demo-note">Leave blank for a generic demo scenario.</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="councilSection" style="display:none;">
+      <div class="council-members">
+        <div class="voice-card" data-voice="Intuition">
+          <div class="voice-avatar intuition-avatar">
+            <div class="speaking-indicator"></div>
+            <span>💙</span>
+          </div>
+          <div class="voice-name">Intuition</div>
+          <div class="voice-role">Expands possibilities</div>
+        </div>
+
+        <div class="voice-card" data-voice="Reason">
+          <div class="voice-avatar reason-avatar">
+            <div class="speaking-indicator"></div>
+            <span>🧠</span>
+          </div>
+          <div class="voice-name">Reason</div>
+          <div class="voice-role">Grounds decisions</div>
+        </div>
+
+        <div class="voice-card" data-voice="Fear">
+          <div class="voice-avatar fear-avatar">
+            <div class="speaking-indicator"></div>
+            <span>🛡️</span>
+          </div>
+          <div class="voice-name">Fear</div>
+          <div class="voice-role">Protects from danger</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="dialogueSection" style="display:none;">
+      <div class="dialogue-card" id="dialogueContainer"></div>
+      <div class="playback-row">
+        <button id="playAllButton" class="secondary-btn">
+          🔊 Play full debate
+        </button>
+        <span class="pill">
+          Line <span id="currentLine">0</span> / <span id="totalLines">0</span>
+        </span>
+      </div>
+    </section>
+
+    <footer class="footer">
+      Built for experimentation • Backed by local LLM + optional ElevenLabs
+    </footer>
+
+    <audio id="audioPlayer" style="display:none;"></audio>
   </div>
 
   <script src="script.js"></script>

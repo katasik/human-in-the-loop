@@ -1,27 +1,28 @@
 # backend/app.py
 
 """
-FastAPI backend for "The Ensemble – Work–Life Reset"
+Inner Council – FastAPI backend
 
-- Uses a local LLM via Ollama (no API keys needed)
-- Uses ElevenLabs for TTS (Guide + Challenger voices)
+- Uses Ollama (local LLM) to generate a 3-voice debate:
+  Intuition, Reason, Fear.
+- Optionally uses ElevenLabs for TTS:
+  one voice per persona, returning /audio/*.mp3.
 - Exposes:
-    POST /api/ensemble  -> returns Guide + Challenger replies (texts + audio URLs)
-    POST /api/summary   -> returns a 3-line Reset Card
+    POST /api/podcast  -> returns list of turns (speaker, text, audio_url, raw_dialogue)
 
 Prerequisites:
 - Install Ollama from https://ollama.com
     - ollama pull llama3.2
 - Install dependencies:
     - pip install fastapi uvicorn[standard] requests python-dotenv elevenlabs
-- Set ELEVEN_API_KEY in your environment (.env or export).
+- Set ELEVEN_API_KEY in your environment (.env or export) if you want ElevenLabs TTS.
 - Then run:
     uvicorn app:app --reload
 """
 
 import os
 import uuid
-from typing import List
+from typing import List, Optional
 
 import requests
 from fastapi import FastAPI
@@ -30,37 +31,35 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from elevenlabs import ElevenLabs
 from dotenv import load_dotenv
+
+from prompts import PODCAST_SYSTEM_PROMPT
+
 load_dotenv()
-
-
-from prompts import (
-    GUIDE_SYSTEM_PROMPT,
-    CHALLENGER_SYSTEM_PROMPT,
-    SUMMARY_SYSTEM_PROMPT,
-    PODCAST_SYSTEM_PROMPT
-)
-
 
 # ------------------------
 # Config
 # ------------------------
 
-# TODO: replace these with your real ElevenLabs voice IDs
-GUIDE_VOICE_ID = "yM93hbw8Qtvdma2wCnJG"
-CHALLENGER_VOICE_ID = "24EI9FmmGvJruwUi7TJM"
-ENABLE_TTS=False
-OLLAMA_MODEL = "llama3.2:1b"
+# Map each persona to a real ElevenLabs voice ID
+INTUITION_VOICE_ID = os.getenv("INTUITION_VOICE_ID", "yM93hbw8Qtvdma2wCnJG")   # warm
+REASON_VOICE_ID    = os.getenv("REASON_VOICE_ID", "24EI9FmmGvJruwUi7TJM")      # logical
+FEAR_VOICE_ID      = os.getenv("FEAR_VOICE_ID", "ZF6FPAbjXT4488VcRRnw")        # protective
+
+# Turn ElevenLabs on/off via env: ENABLE_TTS=true / false
+ENABLE_TTS = True
+
+# Ollama model name
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:1b")
+
 
 # ------------------------
 # LLM helper (Ollama)
 # ------------------------
 
-
 def llm_chat(system_prompt: str, user_text: str) -> str:
     """
     Call local Ollama via /api/generate using a single prompt
     that includes the system instruction and the user text.
-    Works even on Ollama versions without /api/chat.
     """
     url = "http://localhost:11434/api/generate"
 
@@ -80,8 +79,8 @@ def llm_chat(system_prompt: str, user_text: str) -> str:
     resp = requests.post(url, json=payload)
     resp.raise_for_status()
     data = resp.json()
-    # /api/generate returns: {"response": "...", ...}
     return data["response"].strip()
+
 
 # ------------------------
 # ElevenLabs TTS helper
@@ -100,13 +99,13 @@ else:
 def text_to_speech(text: str, voice_id: str) -> str:
     """
     Converts text → audio and saves to /audio folder.
-    Returns a URL for the frontend.
+    Returns a URL path (e.g. "/audio/xyz.mp3").
 
-    If ENABLE_TTS is False, return an empty string so the
-    frontend can fall back to browser speech synthesis.
+    If ENABLE_TTS is False, returns "" so the frontend falls back
+    to browser speech synthesis (two/three different browser voices).
     """
     if not ENABLE_TTS:
-        return ""  # no ElevenLabs call at all
+        return ""
 
     audio_dir = os.path.join(os.path.dirname(__file__), "audio")
     os.makedirs(audio_dir, exist_ok=True)
@@ -127,64 +126,139 @@ def text_to_speech(text: str, voice_id: str) -> str:
                 f.write(chunk)
 
     return f"/audio/{file_id}"
+
+
 # ------------------------
 # FastAPI setup
 # ------------------------
 
-app = FastAPI(title="Ensemble Work–Life Reset")
+app = FastAPI(title="Inner Council – Three-Voice Debate")
 
-# CORS for local frontend
+# CORS for local frontend (file:// or localhost)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # in production you'd restrict this
+    allow_origins=["*"],  # in prod, restrict
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Serve generated audio files
-app.mount("/audio", StaticFiles(directory="audio"), name="audio")
+audio_dir_path = os.path.join(os.path.dirname(__file__), "audio")
+os.makedirs(audio_dir_path, exist_ok=True)
+app.mount("/audio", StaticFiles(directory=audio_dir_path), name="audio")
 
 
 # ------------------------
 # Request / response models
 # ------------------------
 
-
 class PodcastTurn(BaseModel):
-    speaker: str      # "Guide" or "Challenger"
+    speaker: str      # "Intuition" | "Reason" | "Fear"
     text: str
-    audio_url: str    # /audio/....mp3
+    audio_url: str    # "/audio/....mp3" or ""
 
 
 class PodcastRequest(BaseModel):
-    text: str
-    turns: int = 2    # approx rounds per speaker; 2 rounds = 4 lines total
+    text: str          # user challenge
+    turns: int = 18    # requested lines (we clamp to max 20)
 
 
 class PodcastResponse(BaseModel):
     turns: List[PodcastTurn]
+    raw_dialogue: Optional[str] = None  # for debugging
+
+
+# ------------------------
+# Parsing helper
+# ------------------------
+
+def parse_inner_council_dialogue(dialogue: str, desired_lines: int) -> List[PodcastTurn]:
+    """
+    Parse the LLM output into structured turns.
+
+    PASS 1: Strictly require "Intuition:", "Reason:", or "Fear:" prefixes.
+    PASS 2: If nothing parsed, fall back to round-robin Intuition → Reason → Fear
+            over non-empty lines.
+    """
+    lines = [l.strip() for l in dialogue.splitlines() if l.strip()]
+    turns: List[PodcastTurn] = []
+
+    # ---------- PASS 1: Strict prefix parsing ----------
+    for line in lines:
+        if ":" not in line:
+            continue
+
+        speaker_raw, content = line.split(":", 1)
+        speaker_key = speaker_raw.strip().lower()
+        spoken_text = content.strip()
+
+        if not spoken_text:
+            continue
+
+        if speaker_key == "intuition":
+            speaker = "Intuition"
+            voice_id = INTUITION_VOICE_ID
+        elif speaker_key == "reason":
+            speaker = "Reason"
+            voice_id = REASON_VOICE_ID
+        elif speaker_key == "fear":
+            speaker = "Fear"
+            voice_id = FEAR_VOICE_ID
+        else:
+            continue
+
+        audio_url = text_to_speech(spoken_text, voice_id)
+        turns.append(PodcastTurn(speaker=speaker, text=spoken_text, audio_url=audio_url))
+
+        if len(turns) >= desired_lines:
+            return turns
+
+    if turns:
+        return turns
+
+    # ---------- PASS 2: Round-robin fallback ----------
+    role_cycle = [
+        ("Intuition", INTUITION_VOICE_ID),
+        ("Reason", REASON_VOICE_ID),
+        ("Fear", FEAR_VOICE_ID),
+    ]
+
+    fallback_turns: List[PodcastTurn] = []
+    for idx, line in enumerate(lines):
+        if idx >= desired_lines:
+            break
+
+        # Strip any “X:” prefix and keep content
+        if ":" in line:
+            _, content = line.split(":", 1)
+            spoken_text = content.strip() or line
+        else:
+            spoken_text = line
+
+        speaker, voice_id = role_cycle[idx % len(role_cycle)]
+        audio_url = text_to_speech(spoken_text, voice_id)
+        fallback_turns.append(
+            PodcastTurn(speaker=speaker, text=spoken_text, audio_url=audio_url)
+        )
+
+    return fallback_turns
+
 
 # ------------------------
 # Routes
 # ------------------------
 
-
-
 @app.post("/api/podcast", response_model=PodcastResponse)
 def generate_podcast(req: PodcastRequest):
     """
-    Generate a short "podcast" conversation between Guide and Challenger
+    Generate a short Inner Council debate between Intuition, Reason, and Fear
     about the user's situation.
 
-    - LLM produces a scripted dialogue:
-        Guide: ...
-        Challenger: ...
-        ...
-    - We parse that into turns, TTS each turn with the right voice,
-      and return them in order.
+    - Lines 1–3: intros from each voice.
+    - Remaining lines: interactive debate.
     """
-    desired_lines = 20  # hard target
+    desired_lines = min(max(req.turns, 3), 20)
 
     user_msg = (
         f"User's situation: {req.text}\n\n"
@@ -193,34 +267,11 @@ def generate_podcast(req: PodcastRequest):
 
     dialogue = llm_chat(PODCAST_SYSTEM_PROMPT, user_msg)
 
-    turns: List[PodcastTurn] = []
+    # Log raw dialogue for debugging
+    print("\n================ RAW LLM DIALOGUE ================\n")
+    print(dialogue)
+    print("\n==================================================\n")
 
-    for raw_line in dialogue.splitlines():
-        line = raw_line.strip()
-        if not line:
-            continue
+    turns = parse_inner_council_dialogue(dialogue, desired_lines)
 
-        lower = line.lower()
-        if lower.startswith("guide:"):
-            speaker = "Guide"
-            spoken_text = line.split(":", 1)[1].strip()
-            voice_id = GUIDE_VOICE_ID
-        elif lower.startswith("challenger:"):
-            speaker = "Challenger"
-            spoken_text = line.split(":", 1)[1].strip()
-            voice_id = CHALLENGER_VOICE_ID
-        else:
-            continue
-
-        if not spoken_text:
-            continue
-
-        # If we already reached 20 valid lines, stop adding more
-        if len(turns) >= desired_lines:
-            break
-
-        audio_url = text_to_speech(spoken_text, voice_id)
-        turns.append(PodcastTurn(speaker=speaker, text=spoken_text, audio_url=audio_url))
-
-    # Optional: if fewer than 20 lines return, you still get something rather than error
-    return PodcastResponse(turns=turns)
+    return PodcastResponse(turns=turns, raw_dialogue=dialogue)

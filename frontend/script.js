@@ -1,52 +1,67 @@
-const apiBase = "http://127.0.0.1:8000";
+// frontend/script.js
 
-const inputEl = document.getElementById("input");
-const podcastBtn = document.getElementById("podcastBtn");
-const micBtn = document.getElementById("micBtn");
+const API_BASE = "http://127.0.0.1:8000";
 
-const podcastContainer = document.getElementById("podcastContainer");
-const turnsEl = document.getElementById("turns");
-const playAllBtn = document.getElementById("playAllBtn");
+// DOM elements
+const startButton = document.getElementById("startButton");
+const micButton = document.getElementById("micButton");
+const challengeInput = document.getElementById("challengeInput");
 
-// Will store the last podcast response so we can play it all
-let currentPodcastTurns = [];
+const councilSection = document.getElementById("councilSection");
+const dialogueSection = document.getElementById("dialogueSection");
+const dialogueContainer = document.getElementById("dialogueContainer");
+const playAllButton = document.getElementById("playAllButton");
+const currentLineSpan = document.getElementById("currentLine");
+const totalLinesSpan = document.getElementById("totalLines");
+const audioPlayer = document.getElementById("audioPlayer");
+
+// Voice cards
+const voiceCards = {
+  Intuition: document.querySelector('[data-voice="Intuition"]'),
+  Reason: document.querySelector('[data-voice="Reason"]'),
+  Fear: document.querySelector('[data-voice="Fear"]'),
+};
+
+// State
+let currentTurns = [];
+let currentIndex = 0;
+let isPlayingSequence = false;
+let elevenLabsMode = false; // inferred from audio_url presence
 
 // =======================
-//  BROWSER VOICES SETUP
+// Browser TTS voices
 // =======================
 
-let voices = [];
-let guideVoice = null;
-let challengerVoice = null;
+let allVoices = [];
+let intuitionVoice = null;
+let reasonVoice = null;
+let fearVoice = null;
 
-function pickVoices() {
-  voices = window.speechSynthesis.getVoices() || [];
-  if (!voices.length) return;
+function chooseBrowserVoices() {
+  allVoices = window.speechSynthesis.getVoices() || [];
+  if (!allVoices.length) return;
 
-  // Prefer English voices so they sound natural for your content
-  const enVoices = voices.filter(v =>
+  const enVoices = allVoices.filter((v) =>
     v.lang && v.lang.toLowerCase().startsWith("en")
   );
 
-  if (enVoices.length >= 2) {
-    guideVoice = enVoices[0];
-    challengerVoice = enVoices[1];
-  } else {
-    // Fallback: first two available
-    guideVoice = voices[0];
-    challengerVoice = voices[Math.min(1, voices.length - 1)];
-  }
+  const pool = enVoices.length >= 3 ? enVoices : allVoices;
 
-  console.log("Guide voice:", guideVoice?.name, guideVoice?.lang);
-  console.log("Challenger voice:", challengerVoice?.name, challengerVoice?.lang);
+  intuitionVoice = pool[0] || null;
+  reasonVoice = pool[1] || pool[0] || null;
+  fearVoice = pool[2] || pool[1] || pool[0] || null;
+
+  console.log("Intuition voice:", intuitionVoice?.name);
+  console.log("Reason voice:", reasonVoice?.name);
+  console.log("Fear voice:", fearVoice?.name);
 }
 
 if ("speechSynthesis" in window) {
-  window.speechSynthesis.onvoiceschanged = pickVoices;
-  pickVoices();
+  window.speechSynthesis.onvoiceschanged = chooseBrowserVoices;
+  chooseBrowserVoices();
 }
 
-// Helper: speak a single line with browser TTS
+// Helper: browser TTS per persona
 function speakWithBrowserTTS(text, speaker) {
   if (!("speechSynthesis" in window)) {
     alert("Speech synthesis not supported in this browser.");
@@ -55,10 +70,10 @@ function speakWithBrowserTTS(text, speaker) {
   if (!text) return;
 
   const utterance = new SpeechSynthesisUtterance(text);
-  const voice =
-    speaker === "Guide"
-      ? guideVoice || challengerVoice
-      : challengerVoice || guideVoice;
+  let voice = null;
+  if (speaker === "Intuition") voice = intuitionVoice || reasonVoice || fearVoice;
+  else if (speaker === "Reason") voice = reasonVoice || intuitionVoice || fearVoice;
+  else if (speaker === "Fear") voice = fearVoice || reasonVoice || intuitionVoice;
 
   if (voice) utterance.voice = voice;
   window.speechSynthesis.cancel();
@@ -66,102 +81,201 @@ function speakWithBrowserTTS(text, speaker) {
 }
 
 // =======================
-//  PLAYING INDIVIDUAL TURNS
+// UI helpers
 // =======================
 
-// If ElevenLabs is enabled, we expect turn.audio_url to be a non-empty string.
-// If it's empty or missing, we fall back to browser TTS.
-function playTurnAudio(turn) {
+function setLoading(loading) {
+  const textSpan = startButton.querySelector(".button-text");
+  if (loading) {
+    startButton.disabled = true;
+    if (textSpan) textSpan.textContent = "Summoning the Inner Council…";
+  } else {
+    startButton.disabled = false;
+    if (textSpan) textSpan.textContent = "Let the Inner Council speak";
+  }
+}
+
+function clearDialogue() {
+  dialogueContainer.innerHTML = "";
+  currentLineSpan.textContent = "0";
+  totalLinesSpan.textContent = "0";
+  currentTurns = [];
+  currentIndex = 0;
+}
+
+function addMessage(turn) {
+  const div = document.createElement("div");
+  div.className = `dialogue-message ${turn.speaker}`;
+
+  div.innerHTML = `
+    <div class="message-header">${turn.speaker}</div>
+    <div class="message-text">${escapeHtml(turn.text)}</div>
+  `;
+
+  dialogueContainer.appendChild(div);
+  dialogueContainer.scrollTop = dialogueContainer.scrollHeight;
+}
+
+function highlightSpeaker(speaker) {
+  Object.values(voiceCards).forEach((card) =>
+    card.classList.remove("speaking")
+  );
+  const card = voiceCards[speaker];
+  if (card) card.classList.add("speaking");
+}
+
+function clearSpeakerHighlight() {
+  Object.values(voiceCards).forEach((card) =>
+    card.classList.remove("speaking")
+  );
+}
+
+function escapeHtml(text) {
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// =======================
+// Audio playback logic
+// =======================
+
+function playSingleTurn(turn) {
+  // If ElevenLabs audio_url exists, play mp3, else browser TTS
   if (turn.audio_url && turn.audio_url.trim() !== "") {
-    const audio = new Audio(`${apiBase}${turn.audio_url}`);
-    audio.play().catch(err => {
+    const url = `${API_BASE}${turn.audio_url}`;
+    const audio = new Audio(url);
+    audio.play().catch((err) => {
       console.error("Error playing ElevenLabs audio:", err);
-      // fallback to browser TTS if audio fails
       speakWithBrowserTTS(turn.text, turn.speaker);
     });
   } else {
-    // No ElevenLabs audio → use browser voices
     speakWithBrowserTTS(turn.text, turn.speaker);
   }
 }
 
-// =======================
-//  PLAY FULL CONVERSATION
-// =======================
+// Sequential autoplay (full debate)
+function playSequence(startIndex = 0) {
+  if (!currentTurns.length) {
+    alert("Generate a debate first.");
+    return;
+  }
+  currentIndex = startIndex;
+  isPlayingSequence = true;
+  playNextInSequence();
+}
 
-function playFullConversation() {
-  if (!currentPodcastTurns.length) {
-    alert("Generate a conversation first.");
+function playNextInSequence() {
+  if (!isPlayingSequence || currentIndex >= currentTurns.length) {
+    isPlayingSequence = false;
+    clearSpeakerHighlight();
     return;
   }
 
-  const hasAudioUrls = currentPodcastTurns.some(
-    t => t.audio_url && t.audio_url.trim() !== ""
-  );
+  const turn = currentTurns[currentIndex];
+  currentLineSpan.textContent = String(currentIndex + 1);
+  highlightSpeaker(turn.speaker);
 
-  // --- Case A: ElevenLabs TTS mode (ENABLE_TTS = true) ---
-  if (hasAudioUrls) {
-    let idx = 0;
-
-    const playNext = () => {
-      if (idx >= currentPodcastTurns.length) return;
-
-      const turn = currentPodcastTurns[idx];
-      if (turn.audio_url && turn.audio_url.trim() !== "") {
-        const audio = new Audio(`${apiBase}${turn.audio_url}`);
-        audio.onended = () => {
-          idx += 1;
-          playNext();
-        };
-        audio.play().catch(err => {
-          console.error("Error playing ElevenLabs audio:", err);
-          idx += 1;
-          playNext();
-        });
-      } else {
-        // If some turn has no audio_url, fall back to browser TTS for that turn
-        speakWithBrowserTTS(turn.text, turn.speaker);
-        idx += 1;
-        // small delay before next to avoid overlap
-        setTimeout(playNext, 500);
-      }
+  // ElevenLabs mode if ANY turn has audio_url
+  if (elevenLabsMode && turn.audio_url && turn.audio_url.trim() !== "") {
+    audioPlayer.src = `${API_BASE}${turn.audio_url}`;
+    audioPlayer.onended = () => {
+      currentIndex += 1;
+      playNextInSequence();
     };
+    audioPlayer.onerror = () => {
+      console.error("Audio error, skipping to next.");
+      currentIndex += 1;
+      playNextInSequence();
+    };
+    audioPlayer.play().catch((err) => {
+      console.error("Error playing audio:", err);
+      currentIndex += 1;
+      playNextInSequence();
+    });
+  } else {
+    // Browser TTS path
+    if (!("speechSynthesis" in window)) {
+      alert("Speech synthesis not supported.");
+      isPlayingSequence = false;
+      return;
+    }
 
-    playNext();
-    return;
-  }
-
-  // --- Case B: Debug / browser-only TTS mode (ENABLE_TTS = false) ---
-  if (!("speechSynthesis" in window)) {
-    alert("Speech synthesis not supported in this browser.");
-    return;
-  }
-
-  window.speechSynthesis.cancel();
-
-  const utterances = currentPodcastTurns.map(turn => {
     const u = new SpeechSynthesisUtterance(turn.text);
-    const voice =
-      turn.speaker === "Guide"
-        ? guideVoice || challengerVoice
-        : challengerVoice || guideVoice;
+    let voice = null;
+    if (turn.speaker === "Intuition")
+      voice = intuitionVoice || reasonVoice || fearVoice;
+    else if (turn.speaker === "Reason")
+      voice = reasonVoice || intuitionVoice || fearVoice;
+    else if (turn.speaker === "Fear")
+      voice = fearVoice || reasonVoice || intuitionVoice;
+
     if (voice) u.voice = voice;
-    return u;
-  });
 
-  for (let i = 0; i < utterances.length - 1; i++) {
-    utterances[i].onend = () => {
-      window.speechSynthesis.speak(utterances[i + 1]);
+    u.onend = () => {
+      currentIndex += 1;
+      playNextInSequence();
     };
-  }
 
-  if (utterances.length > 0) {
-    window.speechSynthesis.speak(utterances[0]);
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(u);
   }
 }
 
 // =======================
-//  SPEECH RECOGNITION
+// Backend call
+// =======================
+
+async function startInnerCouncil() {
+  clearDialogue();
+  setLoading(true);
+  councilSection.style.display = "none";
+  dialogueSection.style.display = "none";
+
+  const text = challengeInput.value.trim() || "I feel stuck about my work–life balance and I am not sure what to change.";
+
+  try {
+    const resp = await fetch(`${API_BASE}/api/podcast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, turns: 20 }),
+    });
+
+    if (!resp.ok) {
+      throw new Error("Backend error: " + resp.status);
+    }
+
+    const data = await resp.json();
+    const turns = data.turns || [];
+
+    if (!turns.length) {
+      alert("No debate returned from backend.");
+      return;
+    }
+
+    currentTurns = turns;
+    totalLinesSpan.textContent = String(turns.length);
+    elevenLabsMode = turns.some(
+      (t) => t.audio_url && t.audio_url.trim() !== ""
+    );
+
+    councilSection.style.display = "block";
+    dialogueSection.style.display = "block";
+
+    turns.forEach((turn) => addMessage(turn));
+
+    // Auto-start playback from first line
+    playSequence(0);
+  } catch (err) {
+    console.error(err);
+    alert("Something went wrong: " + err.message);
+  } finally {
+    setLoading(false);
+  }
+}
+
+// =======================
+// Speech recognition
 // =======================
 
 let recognition = null;
@@ -175,7 +289,7 @@ if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
 
   recognition.onresult = (event) => {
     const transcript = event.results[0][0].transcript;
-    inputEl.value = transcript; // fill the textarea
+    challengeInput.value = transcript;
   };
 
   recognition.onerror = (event) => {
@@ -183,108 +297,19 @@ if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
     alert("Speech recognition error. Try again or type instead.");
   };
 } else {
-  micBtn.disabled = true;
-  micBtn.textContent = "🎙️ Not supported in this browser";
+  micButton.disabled = true;
+  micButton.textContent = "🎙️ Mic not supported";
 }
 
-micBtn.addEventListener("click", () => {
+micButton.addEventListener("click", () => {
   if (!recognition) return;
-  window.speechSynthesis.cancel(); // stop any speaking
+  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
   recognition.start();
-  micBtn.textContent = "🎙️ Listening...";
-  recognition.onend = () => {
-    micBtn.textContent = "🎙️ Speak instead of typing";
-  };
 });
 
 // =======================
-//  CALL /api/podcast
+// Event listeners
 // =======================
 
-podcastBtn.addEventListener("click", async () => {
-  const text = inputEl.value.trim();
-  if (!text) {
-    alert("Please write (or say) something about your situation first.");
-    return;
-  }
-
-  podcastBtn.disabled = true;
-  podcastBtn.textContent = "Letting them talk...";
-  podcastContainer.style.display = "none";
-  turnsEl.innerHTML = "";
-  currentPodcastTurns = [];
-  window.speechSynthesis.cancel();
-  playAllBtn.disabled = true;
-
-  try {
-    const resp = await fetch(`${apiBase}/api/podcast`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, turns: 6 }), // your ~12 lines
-    });
-
-    if (!resp.ok) {
-      throw new Error("Backend error: " + resp.status);
-    }
-
-    const data = await resp.json();
-    const podcastTurns = data.turns || [];
-
-    if (!podcastTurns.length) {
-      alert("No podcast turns returned from backend.");
-      return;
-    }
-
-    currentPodcastTurns = podcastTurns;
-    podcastContainer.style.display = "block";
-    turnsEl.innerHTML = "";
-    playAllBtn.disabled = false;
-
-    podcastTurns.forEach((turn) => {
-      const wrapper = document.createElement("div");
-      wrapper.className = "turn";
-
-      const header = document.createElement("div");
-      header.className = "turn-header";
-
-      const pill = document.createElement("span");
-      pill.className = "pill";
-      if (turn.speaker === "Challenger") {
-        pill.classList.add("challenger");
-      }
-      pill.textContent = turn.speaker;
-
-      const listenBtn = document.createElement("button");
-      listenBtn.className = "secondary-btn small-btn";
-      listenBtn.textContent = "🔊 Listen";
-
-      header.appendChild(pill);
-      header.appendChild(listenBtn);
-
-      const textP = document.createElement("p");
-      textP.textContent = turn.text;
-
-      wrapper.appendChild(header);
-      wrapper.appendChild(textP);
-      turnsEl.appendChild(wrapper);
-
-      // Per-turn audio behavior:
-      // - ElevenLabs mode: play mp3
-      // - Debug / browser mode: use system TTS with persona-specific voice
-      listenBtn.addEventListener("click", () => {
-        playTurnAudio(turn);
-      });
-    });
-  } catch (err) {
-    console.error(err);
-    alert("Something went wrong: " + err.message);
-  } finally {
-    podcastBtn.disabled = false;
-    podcastBtn.textContent = "Let them talk it out";
-  }
-});
-
-// Full conversation button
-playAllBtn.addEventListener("click", () => {
-  playFullConversation();
-});
+startButton.addEventListener("click", startInnerCouncil);
+playAllButton.addEventListener("click", () => playSequence(0));
