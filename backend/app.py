@@ -37,6 +37,7 @@ from prompts import (
     GUIDE_SYSTEM_PROMPT,
     CHALLENGER_SYSTEM_PROMPT,
     SUMMARY_SYSTEM_PROMPT,
+    PODCAST_SYSTEM_PROMPT
 )
 
 
@@ -45,9 +46,9 @@ from prompts import (
 # ------------------------
 
 # TODO: replace these with your real ElevenLabs voice IDs
-GUIDE_VOICE_ID = "24EI9FmmGvJruwUi7TJM"
-CHALLENGER_VOICE_ID = "yM93hbw8Qtvdma2wCnJG"
-
+GUIDE_VOICE_ID = "yM93hbw8Qtvdma2wCnJG"
+CHALLENGER_VOICE_ID = "24EI9FmmGvJruwUi7TJM"
+ENABLE_TTS=False
 OLLAMA_MODEL = "llama3.2:1b"
 
 # ------------------------
@@ -73,6 +74,7 @@ def llm_chat(system_prompt: str, user_text: str) -> str:
         "model": OLLAMA_MODEL,
         "prompt": prompt,
         "stream": False,
+        "temperature": 0.5,
     }
 
     resp = requests.post(url, json=payload)
@@ -85,30 +87,38 @@ def llm_chat(system_prompt: str, user_text: str) -> str:
 # ElevenLabs TTS helper
 # ------------------------
 
-eleven_api_key = os.getenv("ELEVEN_API_KEY")
-if not eleven_api_key:
-    raise RuntimeError("ELEVEN_API_KEY is not set. Check your environment or .env file.")
-tts_client = ElevenLabs(api_key=eleven_api_key)
+eleven_api_key = os.getenv("ELEVEN_API_KEY") if ENABLE_TTS else None
+
+if ENABLE_TTS:
+    if not eleven_api_key:
+        raise RuntimeError("ELEVEN_API_KEY is not set but ENABLE_TTS is true.")
+    tts_client = ElevenLabs(api_key=eleven_api_key)
+else:
+    tts_client = None
 
 
 def text_to_speech(text: str, voice_id: str) -> str:
     """
     Converts text → audio and saves to /audio folder.
     Returns a URL for the frontend.
+
+    If ENABLE_TTS is False, return an empty string so the
+    frontend can fall back to browser speech synthesis.
     """
-    # Make sure the audio directory exists
+    if not ENABLE_TTS:
+        return ""  # no ElevenLabs call at all
+
     audio_dir = os.path.join(os.path.dirname(__file__), "audio")
     os.makedirs(audio_dir, exist_ok=True)
 
     file_id = f"{uuid.uuid4()}.mp3"
     out_path = os.path.join(audio_dir, file_id)
 
-    # ElevenLabs SDK returns a generator of bytes chunks
     audio_stream = tts_client.text_to_speech.convert(
         voice_id=voice_id,
         text=text,
-        model_id="eleven_turbo_v2",      # or eleven_multilingual_v2, etc.
-        output_format="mp3_44100_128",   # standard mp3
+        model_id="eleven_turbo_v2",
+        output_format="mp3_44100_128",
     )
 
     with open(out_path, "wb") as f:
@@ -116,7 +126,6 @@ def text_to_speech(text: str, voice_id: str) -> str:
             if isinstance(chunk, bytes):
                 f.write(chunk)
 
-    # This path is relative to the StaticFiles mount at /audio
     return f"/audio/{file_id}"
 # ------------------------
 # FastAPI setup
@@ -141,66 +150,77 @@ app.mount("/audio", StaticFiles(directory="audio"), name="audio")
 # Request / response models
 # ------------------------
 
-class EnsembleRequest(BaseModel):
+
+class PodcastTurn(BaseModel):
+    speaker: str      # "Guide" or "Challenger"
     text: str
+    audio_url: str    # /audio/....mp3
 
 
-class EnsembleResponse(BaseModel):
-    guide_text: str
-    challenger_text: str
-    guide_audio_url: str
-    challenger_audio_url: str
+class PodcastRequest(BaseModel):
+    text: str
+    turns: int = 2    # approx rounds per speaker; 2 rounds = 4 lines total
 
 
-class SummaryRequest(BaseModel):
-    transcript: str
-
-
-class SummaryResponse(BaseModel):
-    summary_text: str
-
+class PodcastResponse(BaseModel):
+    turns: List[PodcastTurn]
 
 # ------------------------
 # Routes
 # ------------------------
 
-@app.post("/api/ensemble", response_model=EnsembleResponse)
-def run_ensemble(req: EnsembleRequest):
+
+
+@app.post("/api/podcast", response_model=PodcastResponse)
+def generate_podcast(req: PodcastRequest):
     """
-    Main endpoint:
-    - takes the user's description of their work–life challenge
-    - runs Guide + Challenger agents (two different system prompts)
-    - generates ElevenLabs audio for each
-    - returns texts + audio URLs
+    Generate a short "podcast" conversation between Guide and Challenger
+    about the user's situation.
+
+    - LLM produces a scripted dialogue:
+        Guide: ...
+        Challenger: ...
+        ...
+    - We parse that into turns, TTS each turn with the right voice,
+      and return them in order.
     """
-    user_text = req.text
+    desired_lines = 20  # hard target
 
-    # 1) LLM texts
-    guide_text = llm_chat(GUIDE_SYSTEM_PROMPT, user_text)
-    challenger_text = llm_chat(CHALLENGER_SYSTEM_PROMPT, user_text)
-
-    # 2) TTS audio for both agents
-    guide_audio_url = text_to_speech(guide_text, GUIDE_VOICE_ID)
-    challenger_audio_url = text_to_speech(challenger_text, CHALLENGER_VOICE_ID)
-
-    return EnsembleResponse(
-        guide_text=guide_text,
-        challenger_text=challenger_text,
-        guide_audio_url=guide_audio_url,
-        challenger_audio_url=challenger_audio_url,
+    user_msg = (
+        f"User's situation: {req.text}\n\n"
+        f"Write exactly {desired_lines} lines of dialogue."
     )
 
+    dialogue = llm_chat(PODCAST_SYSTEM_PROMPT, user_msg)
 
-@app.post("/api/summary", response_model=SummaryResponse)
-def summarize_conversation(req: SummaryRequest):
-    """
-    Takes a transcript (user + guide + challenger turns) and generates a Reset Card.
+    turns: List[PodcastTurn] = []
 
-    Output is exactly three lines:
-    - Biggest tension: ...
-    - Trade-off I'm accepting: ...
-    - My 7-day commitment: ...
-    (as defined in SUMMARY_SYSTEM_PROMPT)
-    """
-    summary_text = llm_chat(SUMMARY_SYSTEM_PROMPT, req.transcript)
-    return SummaryResponse(summary_text=summary_text)
+    for raw_line in dialogue.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        lower = line.lower()
+        if lower.startswith("guide:"):
+            speaker = "Guide"
+            spoken_text = line.split(":", 1)[1].strip()
+            voice_id = GUIDE_VOICE_ID
+        elif lower.startswith("challenger:"):
+            speaker = "Challenger"
+            spoken_text = line.split(":", 1)[1].strip()
+            voice_id = CHALLENGER_VOICE_ID
+        else:
+            continue
+
+        if not spoken_text:
+            continue
+
+        # If we already reached 20 valid lines, stop adding more
+        if len(turns) >= desired_lines:
+            break
+
+        audio_url = text_to_speech(spoken_text, voice_id)
+        turns.append(PodcastTurn(speaker=speaker, text=spoken_text, audio_url=audio_url))
+
+    # Optional: if fewer than 20 lines return, you still get something rather than error
+    return PodcastResponse(turns=turns)

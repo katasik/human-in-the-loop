@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>The Ensemble – Work–Life Reset</title>
+  <title>The Ensemble – Work–Life Podcast</title>
   <style>
     body {
       font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
@@ -16,6 +16,9 @@
     }
     h2 {
       margin-top: 2rem;
+    }
+    p {
+      line-height: 1.5;
     }
     textarea {
       width: 100%;
@@ -45,21 +48,23 @@
       color: #111827;
       margin-left: 8px;
     }
-    .agents {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
+    #podcastContainer {
       margin-top: 24px;
+      display: none;
     }
-    .agent {
+    .turn {
       background: white;
       border-radius: 12px;
       padding: 12px 14px;
       border: 1px solid #e5e7eb;
       box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+      margin-bottom: 12px;
     }
-    .agent h3 {
-      margin: 0 0 8px 0;
+    .turn-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
     }
     .pill {
       display: inline-block;
@@ -70,56 +75,38 @@
       letter-spacing: 0.04em;
       background: #eef2ff;
       color: #4338ca;
-      margin-bottom: 4px;
     }
-    .agent p {
-      margin: 0 0 8px 0;
+    .pill.challenger {
+      background: #fef3c7;
+      color: #9a3412;
+    }
+    .turn p {
+      margin: 0;
       white-space: pre-wrap;
     }
-    #resetCard {
-      margin-top: 24px;
-      padding: 14px 16px;
-      border-radius: 12px;
-      background: #ecfdf5;
-      border: 1px solid #bbf7d0;
-      display: none;
-    }
-    #resetCard pre {
-      margin: 8px 0 0 0;
-      font-family: inherit;
-      white-space: pre-wrap;
+    .small-btn {
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 0.8rem;
     }
   </style>
 </head>
 <body>
-  <h1>The Ensemble – Work–Life Reset</h1>
-  <p>Describe your current work–life challenge in a few sentences. The Guide and the Challenger will respond from different angles.</p>
+  <h1>The Ensemble – Work–Life Podcast</h1>
+  <p>
+    Describe your current work–life challenge. Then listen as two friends –
+    a warm Guide and a rational Challenger – talk it through from different perspectives.
+  </p>
 
-  <textarea id="input" placeholder="E.g., I feel like I'm always working late and have no energy left for my partner or hobbies."></textarea>
+  <textarea id="input" placeholder="E.g., I feel like I'm always working late and I have no energy left for anything else."></textarea>
   <br>
-  <button id="runBtn">Talk to the Ensemble</button>
+  <button id="podcastBtn">Let them talk it out</button>
   <button id="micBtn" class="secondary-btn">🎙️ Speak instead of typing</button>
-  <button id="summaryBtn" class="secondary-btn" disabled>Generate Reset Card</button>
 
-  <div class="agents" id="agents" style="display:none;">
-    <div class="agent">
-      <div class="pill">Guide</div>
-      <h3>Warm facilitator</h3>
-      <p id="guideText"></p>
-      <button id="guideSpeakBtn" class="secondary-btn">🔊 Listen to Guide</button>
-    </div>
-
-    <div class="agent">
-      <div class="pill">Challenger</div>
-      <h3>Direct strategist</h3>
-      <p id="challengerText"></p>
-      <button id="challengerSpeakBtn" class="secondary-btn">🔊 Listen to Challenger</button>
-    </div>
-  </div>
-
-  <div id="resetCard">
-    <strong>Work–Life Reset Card</strong>
-    <pre id="resetText"></pre>
+  <div id="podcastContainer">
+    <h2>Their conversation about your situation</h2>
+    <button id="playAllBtn" class="secondary-btn">🔊 Play full conversation</button>
+    <div id="turns"></div>
   </div>
 
   <script src="script.js"></script>
