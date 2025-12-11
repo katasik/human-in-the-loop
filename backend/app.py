@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from elevenlabs import ElevenLabs
 from dotenv import load_dotenv
 
-from prompts import PODCAST_SYSTEM_PROMPT
+from backend.prompts import PODCAST_SYSTEM_PROMPT
 
 load_dotenv()
 
