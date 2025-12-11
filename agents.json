@@ -1,0 +1,20 @@
+{
+    "agents": [
+        {
+            "config": "agent_configs/intuition-1.json",
+            "id": "agent_3101kc72jp4bekys13g272jan37n"
+        },
+        {
+            "config": "agent_configs/reason-1.json",
+            "id": "agent_1801kc72k3pkf9s8grnznk4fhcnh"
+        },
+        {
+            "config": "agent_configs/fear-1.json",
+            "id": "agent_8501kc72ke3ce1jsa2c36xrnf3sa"
+        },
+        {
+            "config": "agent_configs/inner-council-1.json",
+            "id": "agent_6001kc72tf64eyybgqxes28z1zvd"
+        }
+    ]
+}

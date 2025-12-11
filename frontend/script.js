@@ -5,383 +5,257 @@
 const apiBase = "http://127.0.0.1:8000";
 
 // =======================
-// DOM + STATE
+// STATE
 // =======================
 
-let currentDialogue = [];
-let currentIndex = 0;
-let isPaused = false;
-let currentAudio = null;
+let conversation = null;
+let isActive = false;
 
-// Inner Council UI elements (from your index.html)
-const startButton = document.getElementById("startButton");
-const challengeInput = document.getElementById("challengeInput");
-const inputSection = document.getElementById("inputSection");
-const councilSection = document.getElementById("councilSection");
-const dialogueSection = document.getElementById("dialogueSection");
-const dialogueContainer = document.getElementById("dialogueContainer");
-const pauseButton = document.getElementById("pauseButton");
-const currentMessageSpan = document.getElementById("currentMessage");
-const totalMessagesSpan = document.getElementById("totalMessages");
+// =======================
+// DOM ELEMENTS
+// =======================
 
-// optional mic button (if you have one)
-const micButton =
-  document.getElementById("micBtn") ||
-  document.getElementById("micButton") ||
-  document.getElementById("speakInsteadBtn") ||
-  null;
+const startBtn = document.getElementById("startBtn");
+const centerSpotlight = document.getElementById("centerSpotlight");
+const centerIcon = document.getElementById("centerIcon");
+const centerLabel = document.getElementById("centerLabel");
+const centerStatus = document.getElementById("centerStatus");
+const captionsArea = document.getElementById("captionsArea");
+const captionPlaceholder = document.getElementById("captionPlaceholder");
 
-// persona cards
-const voiceCards = {
-  Intuition: document.querySelector('[data-voice="intuition"]'),
-  Reason: document.querySelector('[data-voice="reason"]'),
-  Fear: document.querySelector('[data-voice="fear"]'),
+const personaOrbs = {
+  intuition: document.querySelector('.persona-orb.intuition'),
+  reason: document.querySelector('.persona-orb.reason'),
+  fear: document.querySelector('.persona-orb.fear')
+};
+
+// Persona definitions
+const personas = {
+  intuition: { icon: '💙', name: 'Intuition', color: 'intuition' },
+  reason: { icon: '🧠', name: 'Reason', color: 'reason' },
+  fear: { icon: '🛡️', name: 'Fear', color: 'fear' },
+  user: { icon: '🎤', name: 'You', color: 'user' }
 };
 
 // =======================
-// BROWSER TTS VOICES
+// UI FUNCTIONS
 // =======================
 
-let allVoices = [];
-let intuitionVoice = null;
-let reasonVoice = null;
-let fearVoice = null;
+function setActivePersona(personaKey) {
+  // Clear all active states
+  Object.values(personaOrbs).forEach(orb => orb?.classList.remove('active'));
+  centerSpotlight.className = 'center-spotlight';
 
-function pickBrowserVoices() {
-  if (!("speechSynthesis" in window)) return;
+  if (personaKey && personas[personaKey]) {
+    const persona = personas[personaKey];
 
-  allVoices = window.speechSynthesis.getVoices() || [];
-  if (!allVoices.length) return;
+    // Update center spotlight
+    centerSpotlight.classList.add('active', persona.color);
+    centerIcon.textContent = persona.icon;
+    centerLabel.textContent = persona.name;
 
-  // Prefer English voices if possible
-  const enVoices = allVoices.filter(
-    (v) => v.lang && v.lang.toLowerCase().startsWith("en")
-  );
-  const pool = enVoices.length >= 3 ? enVoices : allVoices;
-
-  intuitionVoice = pool[0] || null;
-  reasonVoice = pool[1] || pool[0] || null;
-  fearVoice = pool[2] || pool[1] || pool[0] || null;
-
-  console.log("🎙 Intuition voice:", intuitionVoice?.name);
-  console.log("🎙 Reason voice   :", reasonVoice?.name);
-  console.log("🎙 Fear voice     :", fearVoice?.name);
-}
-
-if ("speechSynthesis" in window) {
-  window.speechSynthesis.onvoiceschanged = pickBrowserVoices;
-  pickBrowserVoices();
-}
-
-function speakWithBrowserTTS(text, speaker) {
-  if (!("speechSynthesis" in window)) return;
-  if (!text) return;
-
-  const u = new SpeechSynthesisUtterance(text);
-
-  let v = intuitionVoice;
-  if (speaker === "Reason") v = reasonVoice || intuitionVoice;
-  if (speaker === "Fear") v = fearVoice || reasonVoice || intuitionVoice;
-
-  if (v) u.voice = v;
-
-  // Stop any ongoing TTS but not audio elements
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(u);
-}
-
-// =======================
-// UI HELPERS
-// =======================
-
-function setButtonLoading(loading) {
-  if (!startButton) return;
-
-  const buttonText = startButton.querySelector(".button-text");
-  const buttonLoader = startButton.querySelector(".button-loader");
-
-  if (loading) {
-    startButton.disabled = true;
-    if (buttonText) buttonText.style.display = "none";
-    if (buttonLoader) buttonLoader.style.display = "flex";
-  } else {
-    startButton.disabled = false;
-    if (buttonText) buttonText.style.display = "inline";
-    if (buttonLoader) buttonLoader.style.display = "none";
+    // Highlight the corresponding orb
+    if (personaOrbs[personaKey]) {
+      personaOrbs[personaKey].classList.add('active');
+    }
   }
 }
 
-function clearActiveSpeakers() {
-  Object.values(voiceCards).forEach((card) => {
-    if (card) card.classList.remove("speaking");
-  });
+function setStatus(status) {
+  centerStatus.textContent = status;
 }
 
-function setActiveSpeaker(speaker) {
-  clearActiveSpeakers();
-  const key = speaker.toLowerCase(); // intuition / reason / fear
-  const card = document.querySelector(`[data-voice="${key}"]`);
-  if (card) card.classList.add("speaking");
+function resetUI() {
+  centerSpotlight.className = 'center-spotlight';
+  centerIcon.textContent = '🎭';
+  centerLabel.textContent = 'Ready';
+  centerStatus.textContent = 'Click below to begin';
+  Object.values(personaOrbs).forEach(orb => orb?.classList.remove('active'));
+}
+
+function addCaption(personaKey, text) {
+  // Remove placeholder if present
+  if (captionPlaceholder) {
+    captionPlaceholder.style.display = 'none';
+  }
+
+  const persona = personas[personaKey] || personas.user;
+
+  const entry = document.createElement('div');
+  entry.className = `caption-entry ${persona.color}`;
+  entry.innerHTML = `
+    <div class="caption-speaker">${persona.icon} ${persona.name}</div>
+    <div class="caption-text">${escapeHtml(text)}</div>
+  `;
+
+  captionsArea.appendChild(entry);
+  captionsArea.scrollTop = captionsArea.scrollHeight;
+}
+
+function clearCaptions() {
+  captionsArea.innerHTML = '';
+  if (captionPlaceholder) {
+    captionsArea.appendChild(captionPlaceholder);
+    captionPlaceholder.style.display = 'block';
+  }
 }
 
 function escapeHtml(text) {
-  const div = document.createElement("div");
+  const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
 }
 
-function addMessageToDialogue(turn) {
-  if (!dialogueContainer) return;
+// =======================
+// PERSONA DETECTION
+// =======================
 
-  const cls = turn.speaker.toLowerCase(); // intuition / reason / fear
-  const messageDiv = document.createElement("div");
-  messageDiv.className = `dialogue-message ${cls}`;
+function detectPersonaFromText(text) {
+  const lower = text.toLowerCase();
 
-  messageDiv.innerHTML = `
-    <div class="message-header">
-      <span class="message-speaker">${turn.speaker}</span>
-    </div>
-    <div class="message-text">${escapeHtml(turn.text)}</div>
-  `;
+  // Check for explicit persona markers
+  if (lower.includes('**intuition:**') || lower.includes('intuition:') ||
+      lower.startsWith('i feel') || lower.startsWith('i sense')) {
+    return 'intuition';
+  }
+  if (lower.includes('**reason:**') || lower.includes('reason:') ||
+      lower.startsWith('i think') || lower.startsWith('i notice')) {
+    return 'reason';
+  }
+  if (lower.includes('**fear:**') || lower.includes('fear:') ||
+      lower.includes("i'm scared") || lower.includes("i'm worried") ||
+      lower.includes("i'm tightening")) {
+    return 'fear';
+  }
 
-  dialogueContainer.appendChild(messageDiv);
-  dialogueContainer.scrollTop = dialogueContainer.scrollHeight;
+  // Default to null (will show as council/agent)
+  return null;
 }
 
 // =======================
-// AUDIO LOGIC (ONE TURN)
+// CONVERSATION HANDLING
 // =======================
 
-async function playTurn(turn) {
-  // Stop previous audio + browser speech
-  if (currentAudio) {
-    currentAudio.pause();
-    currentAudio = null;
-  }
-  if ("speechSynthesis" in window) {
-    window.speechSynthesis.cancel();
-  }
-
-  // A) If backend already gave us ElevenLabs mp3
-  if (turn.audio_url && turn.audio_url.trim() !== "") {
-    const audio = new Audio(apiBase + turn.audio_url);
-    currentAudio = audio;
-
-    return new Promise((resolve) => {
-      audio.onended = resolve;
-      audio.onerror = () => {
-        console.error("Error playing audio_url, falling back to browser TTS");
-        speakWithBrowserTTS(turn.text, turn.speaker);
-        setTimeout(resolve, 1500);
-      };
-
-      audio
-        .play()
-        .catch((err) => {
-          console.error("Play error, falling back to browser TTS:", err);
-          speakWithBrowserTTS(turn.text, turn.speaker);
-          setTimeout(resolve, 1500);
-        });
-    });
-  }
-
-  // B) If audio_url missing (in theory) → ask backend /api/tts
-  try {
-    const resp = await fetch(`${apiBase}/api/tts`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ speaker: turn.speaker, text: turn.text }),
-    });
-
-    if (!resp.ok) throw new Error("TTS backend error: " + resp.status);
-
-    const data = await resp.json();
-    const audioUrl = data.audio_url;
-
-    if (audioUrl && audioUrl.trim() !== "") {
-      turn.audio_url = audioUrl;
-
-      const audio = new Audio(apiBase + audioUrl);
-      currentAudio = audio;
-
-      return new Promise((resolve) => {
-        audio.onended = resolve;
-        audio.onerror = () => {
-          console.error(
-            "Error playing generated audio, falling back to browser TTS"
-          );
-          speakWithBrowserTTS(turn.text, turn.speaker);
-          setTimeout(resolve, 1500);
-        };
-
-        audio
-          .play()
-          .catch((err) => {
-            console.error("Play error, falling back to browser TTS:", err);
-            speakWithBrowserTTS(turn.text, turn.speaker);
-            setTimeout(resolve, 1500);
-          });
-      });
-    }
-  } catch (err) {
-    console.error("Error calling /api/tts:", err);
-  }
-
-  // C) Final fallback if everything fails
-  speakWithBrowserTTS(turn.text, turn.speaker);
-  return new Promise((resolve) => setTimeout(resolve, 1500));
-}
-
-// =======================
-// PLAYING THE DEBATE
-// =======================
-
-async function playNextMessage() {
-  if (isPaused) return;
-  if (currentIndex >= currentDialogue.length) {
-    clearActiveSpeakers();
-    if (pauseButton) pauseButton.style.display = "none";
+async function startConversation() {
+  if (isActive) {
+    await endConversation();
     return;
   }
 
-  const turn = currentDialogue[currentIndex];
-
-  if (currentMessageSpan)
-    currentMessageSpan.textContent = String(currentIndex + 1);
-
-  setActiveSpeaker(turn.speaker);
-  addMessageToDialogue(turn);
-
-  await playTurn(turn);
-
-  if (!isPaused) {
-    currentIndex += 1;
-    playNextMessage();
-  }
-}
-
-// =======================
-// START SESSION
-// =======================
-
-async function startSession() {
   try {
-    setButtonLoading(true);
+    // Request microphone permission
+    await navigator.mediaDevices.getUserMedia({ audio: true });
 
-    const userText = (challengeInput?.value || "").trim();
+    // Update UI
+    startBtn.disabled = true;
+    startBtn.textContent = '⏳ Connecting...';
+    setStatus('Connecting to the Council...');
 
-    // Backend PodcastRequest expects { text, turns }
-    const body = {
-      text:
-        userText ||
-        "I feel torn between work and life and I'm not sure how to move forward.",
-      turns: 3, // not really used, but accepted
-    };
+    // Get signed URL from backend
+    const signedUrlResp = await fetch(`${apiBase}/api/signed-url`);
+    if (!signedUrlResp.ok) {
+      throw new Error("Failed to get signed URL: " + await signedUrlResp.text());
+    }
+    const signedUrl = await signedUrlResp.text();
 
-    const resp = await fetch(`${apiBase}/api/podcast`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+    // Wait for SDK to be available
+    let attempts = 0;
+    while (!window.ElevenLabsConversation && attempts < 20) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      attempts++;
+    }
+
+    const Conversation = window.ElevenLabsConversation;
+    if (!Conversation) {
+      throw new Error("ElevenLabs SDK not loaded. Please refresh the page.");
+    }
+
+    // Clear previous captions
+    clearCaptions();
+
+    // Start the conversation session
+    conversation = await Conversation.startSession({
+      signedUrl: signedUrl,
+
+      onConnect: () => {
+        console.log("🎤 Connected to Inner Council");
+        isActive = true;
+        startBtn.disabled = false;
+        startBtn.textContent = '🛑 End Conversation';
+        startBtn.classList.add('active');
+
+        setActivePersona('user');
+        setStatus('Listening to you...');
+      },
+
+      onDisconnect: () => {
+        console.log("📴 Disconnected from Inner Council");
+        endConversation();
+      },
+
+      onMessage: (message) => {
+        console.log("💬 Message:", message);
+
+        if (message.source === 'ai' || message.source === 'agent') {
+          // Detect which persona is speaking from the text
+          const text = message.message || '';
+          const persona = detectPersonaFromText(text);
+
+          // Add caption
+          addCaption(persona || 'reason', text); // Default to reason if can't detect
+
+          // Update active persona based on text
+          if (persona) {
+            setActivePersona(persona);
+          }
+        } else if (message.source === 'user') {
+          addCaption('user', message.message || '');
+        }
+      },
+
+      onModeChange: (mode) => {
+        console.log("🔄 Mode:", mode);
+
+        if (mode.mode === 'speaking') {
+          setStatus('Council is speaking...');
+          // The actual persona will be set when we receive the message
+        } else if (mode.mode === 'listening') {
+          setActivePersona('user');
+          setStatus('Listening to you...');
+        }
+      },
+
+      onError: (error) => {
+        console.error("❌ Error:", error);
+        alert("Voice conversation error: " + (error.message || error));
+        endConversation();
+      }
     });
 
-    if (!resp.ok) {
-      throw new Error("Failed to start debate");
-    }
-
-    const data = await resp.json();
-    const turns = data.turns || [];
-    if (!turns.length) {
-      throw new Error("No debate returned from backend");
-    }
-
-    currentDialogue = turns;
-    currentIndex = 0;
-    isPaused = false;
-
-    if (dialogueContainer) dialogueContainer.innerHTML = "";
-    if (totalMessagesSpan)
-      totalMessagesSpan.textContent = String(currentDialogue.length);
-    if (currentMessageSpan) currentMessageSpan.textContent = "0";
-
-    // Show the council + dialogue, optionally hide input
-    if (inputSection) inputSection.style.display = "none";
-    if (councilSection) councilSection.style.display = "block";
-    if (dialogueSection) dialogueSection.style.display = "block";
-    if (pauseButton) pauseButton.style.display = "inline-flex";
-
-    await playNextMessage();
   } catch (err) {
-    console.error(err);
-    alert("Something went wrong: " + err.message);
-  } finally {
-    setButtonLoading(false);
+    console.error("Failed to start conversation:", err);
+    alert("Failed to start conversation: " + err.message);
+    startBtn.disabled = false;
+    startBtn.textContent = '🎤 Start Conversation';
+    resetUI();
   }
 }
 
-// =======================
-// PAUSE / RESUME
-// =======================
-
-function togglePause() {
-  isPaused = !isPaused;
-  if (!pauseButton) return;
-
-  const pauseIcon = pauseButton.querySelector(".pause-icon");
-  const playIcon = pauseButton.querySelector(".play-icon");
-
-  if (isPaused) {
-    if (currentAudio) currentAudio.pause();
-    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
-    if (pauseIcon) pauseIcon.style.display = "none";
-    if (playIcon) playIcon.style.display = "inline";
-  } else {
-    if (pauseIcon) pauseIcon.style.display = "inline";
-    if (playIcon) playIcon.style.display = "none";
-    playNextMessage();
+async function endConversation() {
+  if (conversation) {
+    try {
+      await conversation.endSession();
+    } catch (e) {
+      console.log("Session end error (may be already ended):", e);
+    }
+    conversation = null;
   }
-}
 
-// =======================
-// SPEECH-TO-TEXT (MIC)
-// =======================
-
-let recognition = null;
-
-if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  recognition = new SR();
-  recognition.lang = "en-US";
-  recognition.interimResults = false;
-  recognition.maxAlternatives = 1;
-
-  recognition.onresult = (event) => {
-    const transcript = event.results[0][0].transcript;
-    if (challengeInput) challengeInput.value = transcript;
-  };
-
-  recognition.onerror = (event) => {
-    console.error("STT error:", event);
-    alert("Speech recognition error. Try again or type instead.");
-  };
-} else if (micButton) {
-  micButton.disabled = true;
-  micButton.textContent = "Speech not supported";
-}
-
-if (micButton && recognition) {
-  micButton.addEventListener("click", () => {
-    if (!recognition) return;
-
-    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
-    if (currentAudio) currentAudio.pause();
-
-    recognition.start();
-    const original = micButton.textContent;
-    micButton.textContent = "Listening…";
-    recognition.onend = () => {
-      micButton.textContent = original;
-    };
-  });
+  isActive = false;
+  startBtn.disabled = false;
+  startBtn.textContent = '🎤 Start Conversation';
+  startBtn.classList.remove('active');
+  resetUI();
 }
 
 // =======================
@@ -389,15 +263,7 @@ if (micButton && recognition) {
 // =======================
 
 document.addEventListener("DOMContentLoaded", () => {
-  if (startButton) startButton.addEventListener("click", startSession);
-  if (pauseButton) pauseButton.addEventListener("click", togglePause);
-});
-
-// Spacebar = pause/resume when dialogue visible
-document.addEventListener("keydown", (e) => {
-  if (!dialogueSection) return;
-  if (e.code === "Space" && dialogueSection.style.display !== "none") {
-    e.preventDefault();
-    togglePause();
+  if (startBtn) {
+    startBtn.addEventListener("click", startConversation);
   }
 });

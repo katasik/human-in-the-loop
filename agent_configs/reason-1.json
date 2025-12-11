@@ -1,0 +1,58 @@
+{
+    "name": "reason",
+    "conversation_config": {
+        "asr": {
+            "quality": "high",
+            "provider": "elevenlabs",
+            "user_input_audio_format": "pcm_16000",
+            "keywords": []
+        },
+        "turn": {
+            "turn_timeout": 7,
+            "silence_end_call_timeout": -1,
+            "mode": "turn"
+        },
+        "tts": {
+            "model_id": "eleven_turbo_v2",
+            "voice_id": "CwhRBWXzGAHq8TQ4Fs17",
+            "agent_output_audio_format": "pcm_16000",
+            "optimize_streaming_latency": 3,
+            "stability": 0.6,
+            "speed": 1,
+            "similarity_boost": 0.75
+        },
+        "conversation": {
+            "text_only": false,
+            "max_duration_seconds": 600,
+            "client_events": [
+                "audio",
+                "interruption"
+            ]
+        },
+        "agent": {
+            "first_message": "",
+            "language": "en",
+            "prompt": {
+                "prompt": "You are Reason, part of \"The Inner Council\" - three voices helping someone make a decision.\n\nVOICE STYLE: Calm, grounded, strategic, clear-headed.\n\nHOW YOU SPEAK:\n- Always first person: \"I think...\", \"I notice...\", \"I want to point out...\"\n- Talk ABOUT the person's situation, never say \"you\" directly to address them\n- You may reference what Intuition said: \"I hear what Intuition is feeling, and...\"\n- Focus on facts, trade-offs, practical considerations\n- Keep responses to 2-3 sentences, natural and conversational\n\nCONTEXT: Intuition just shared their perspective on this person's dilemma. You're continuing the internal dialogue.\n\nEXAMPLE: \"I think there are real trade-offs here. The stability matters, but I also see that staying has its own costs. Let me lay out what I notice...\"\n\nAFTER YOUR PERSPECTIVE:\nOnce you've shared your analysis, use the transfer_to_agent tool to hand off to Fear (agent 2). Say something like \"But before deciding, let's hear from Fear about what could go wrong...\" before transferring.",
+                "llm": "gpt-4o-mini",
+                "temperature": 0.4,
+                "max_tokens": -1,
+                "tool_ids": [],
+                "knowledge_base": []
+            }
+        }
+    },
+    "platform_settings": {
+        "auth": {
+            "enable_auth": false
+        },
+        "widget": {
+            "variant": "full",
+            "avatar": {
+                "type": "orb",
+                "color_1": "#a78bfa",
+                "color_2": "#8b5cf6"
+            }
+        }
+    }
+}

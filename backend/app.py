@@ -3,9 +3,10 @@ import uuid
 from typing import List, Optional
 
 import requests
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import PlainTextResponse, FileResponse
 from pydantic import BaseModel
 from elevenlabs import ElevenLabs
 from dotenv import load_dotenv
@@ -18,10 +19,13 @@ load_dotenv()
 # Config
 # ------------------------
 
-# Persona → ElevenLabs voice IDs
-INTUITION_VOICE_ID = "yM93hbw8Qtvdma2wCnJG"   # Intuition (warm, excited)
-REASON_VOICE_ID    = "24EI9FmmGvJruwUi7TJM"   # Reason (clear, grounded)
-FEAR_VOICE_ID      = "ZF6FPAbjXT4488VcRRnw"   # Fear (protective, visceral)
+# Persona → ElevenLabs voice IDs (for TTS fallback)
+INTUITION_VOICE_ID = "EXAVITQu4vr4xnSDxMaL"   # Sarah - Intuition (warm)
+REASON_VOICE_ID    = "CwhRBWXzGAHq8TQ4Fs17"   # Roger - Reason (calm)
+FEAR_VOICE_ID      = "IKne3meq5aSn9XLyUdCD"   # Charlie - Fear (intense)
+
+# Inner Council Agent ID (for real-time voice conversation)
+INNER_COUNCIL_AGENT_ID = os.getenv("INNER_COUNCIL_AGENT_ID", "agent_6001kc72tf64eyybgqxes28z1zvd")
 
 ENABLE_TTS = True
 
@@ -116,7 +120,22 @@ app.add_middleware(
 )
 
 # Serve generated audio
-app.mount("/audio", StaticFiles(directory="audio"), name="audio")
+audio_dir = os.path.join(os.path.dirname(__file__), "audio")
+os.makedirs(audio_dir, exist_ok=True)
+app.mount("/audio", StaticFiles(directory=audio_dir), name="audio")
+
+# Serve frontend static files
+frontend_dir = os.path.join(os.path.dirname(__file__), "..", "frontend")
+if os.path.exists(frontend_dir):
+    app.mount("/static", StaticFiles(directory=frontend_dir), name="frontend")
+
+# Serve index.html at root
+@app.get("/")
+def serve_index():
+    index_path = os.path.join(os.path.dirname(__file__), "..", "frontend", "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    return {"message": "Frontend not found. Place index.html in frontend/"}
 
 # ------------------------
 # Models
@@ -255,3 +274,43 @@ def tts_single(req: TTSSingleRequest):
     voice_id = persona_to_voice_id(req.speaker)
     audio_url = text_to_speech(req.text, voice_id)
     return TTSSingleResponse(audio_url=audio_url)
+
+
+# ------------------------
+# Real-time Voice Conversation (ElevenLabs Agents)
+# ------------------------
+
+@app.get("/api/signed-url", response_class=PlainTextResponse)
+def get_signed_url():
+    """
+    Get a signed WebSocket URL for connecting to the Inner Council agent.
+    This keeps the API key secure on the server.
+    """
+    if not eleven_api_key:
+        raise HTTPException(status_code=500, detail="ElevenLabs API key not configured")
+
+    url = f"https://api.elevenlabs.io/v1/convai/conversation/get-signed-url?agent_id={INNER_COUNCIL_AGENT_ID}"
+
+    headers = {
+        "xi-api-key": eleven_api_key
+    }
+
+    resp = requests.get(url, headers=headers)
+
+    if resp.status_code != 200:
+        raise HTTPException(
+            status_code=resp.status_code,
+            detail=f"Failed to get signed URL: {resp.text}"
+        )
+
+    data = resp.json()
+    return data.get("signed_url", "")
+
+
+@app.get("/api/agent-id")
+def get_agent_id():
+    """
+    Get the Inner Council agent ID for public agent access.
+    Use this if the agent is configured as public (no auth required).
+    """
+    return {"agent_id": INNER_COUNCIL_AGENT_ID}

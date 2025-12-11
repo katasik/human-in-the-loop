@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>The Inner Council – Three Voices</title>
+  <title>The Inner Council</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -19,11 +19,11 @@
 
     :root {
       --intuition-color: #60a5fa;
-      --intuition-glow: rgba(96, 165, 250, 0.3);
+      --intuition-glow: rgba(96, 165, 250, 0.4);
       --reason-color: #a78bfa;
-      --reason-glow: rgba(167, 139, 250, 0.3);
+      --reason-glow: rgba(167, 139, 250, 0.4);
       --fear-color: #fbbf24;
-      --fear-glow: rgba(251, 191, 36, 0.3);
+      --fear-glow: rgba(251, 191, 36, 0.4);
       --bg-dark: #0f172a;
       --bg-card: #1e293b;
       --text-primary: #f1f5f9;
@@ -32,312 +32,323 @@
     }
 
     body {
-      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
-        sans-serif;
-      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(ellipse at center, #1e293b 0%, #0f172a 70%);
       color: var(--text-primary);
       min-height: 100vh;
       line-height: 1.6;
+      overflow-x: hidden;
     }
 
     .container {
-      max-width: 1200px;
+      max-width: 1000px;
       margin: 0 auto;
-      padding: 2rem 1rem 3rem;
+      padding: 1.5rem 1rem;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
     }
 
+    /* Header */
     .header {
       text-align: center;
-      margin-bottom: 2.5rem;
-      padding: 2rem 0 1rem;
+      margin-bottom: 1.5rem;
     }
 
     .title {
-      font-size: 2.6rem;
+      font-size: 2.2rem;
       font-weight: 700;
-      background: linear-gradient(
-        135deg,
-        var(--intuition-color),
-        var(--reason-color),
-        var(--fear-color)
-      );
+      background: linear-gradient(135deg, var(--intuition-color), var(--reason-color), var(--fear-color));
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
-      margin-bottom: 0.4rem;
+      margin-bottom: 0.3rem;
     }
 
     .subtitle {
-      font-size: 1.05rem;
-      color: var(--text-secondary);
-    }
-
-    .input-card {
-      background: var(--bg-card);
-      border-radius: 1rem;
-      padding: 2rem;
-      border: 1px solid var(--border-color);
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-      margin-bottom: 2.5rem;
-    }
-
-    .input-label {
-      display: block;
-      font-size: 1.05rem;
-      font-weight: 500;
-      margin-bottom: 0.75rem;
-    }
-
-    .challenge-input {
-      width: 100%;
-      padding: 0.9rem;
-      font-size: 0.98rem;
-      font-family: inherit;
-      background: var(--bg-dark);
-      color: var(--text-primary);
-      border: 2px solid var(--border-color);
-      border-radius: 0.5rem;
-      resize: vertical;
-      min-height: 100px;
-      transition: border-color 0.2s;
-    }
-
-    .challenge-input:focus {
-      outline: none;
-      border-color: var(--intuition-color);
-    }
-
-    .buttons-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.75rem;
-      margin-top: 1rem;
-      align-items: center;
-    }
-
-    .primary-btn,
-    .secondary-btn {
-      padding: 0.7rem 1.4rem;
-      border-radius: 999px;
-      border: none;
-      cursor: pointer;
       font-size: 0.95rem;
-      font-weight: 500;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-    }
-
-    .primary-btn {
-      background: linear-gradient(
-        135deg,
-        var(--intuition-color),
-        var(--reason-color)
-      );
-      color: white;
-    }
-
-    .primary-btn:disabled {
-      opacity: 0.65;
-      cursor: wait;
-    }
-
-    .secondary-btn {
-      background: #e5e7eb;
-      color: #111827;
-    }
-
-    .demo-note {
-      margin-top: 0.5rem;
-      font-size: 0.85rem;
       color: var(--text-secondary);
     }
 
-    .council-members {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-      gap: 1.4rem;
-      margin-bottom: 2rem;
-    }
-
-    .voice-card {
-      background: var(--bg-card);
-      border-radius: 1rem;
-      padding: 1.4rem;
-      border: 2px solid var(--border-color);
-      text-align: center;
-      transition: transform 0.3s, border-color 0.3s, box-shadow 0.3s;
-    }
-
-    .voice-card.speaking {
-      transform: scale(1.04);
-    }
-
-    .voice-card[data-voice="Intuition"].speaking {
-      border-color: var(--intuition-color);
-      box-shadow: 0 0 25px var(--intuition-glow);
-    }
-
-    .voice-card[data-voice="Reason"].speaking {
-      border-color: var(--reason-color);
-      box-shadow: 0 0 25px var(--reason-glow);
-    }
-
-    .voice-card[data-voice="Fear"].speaking {
-      border-color: var(--fear-color);
-      box-shadow: 0 0 25px var(--fear-glow);
-    }
-
-    .voice-avatar {
-      width: 80px;
-      height: 80px;
-      margin: 0 auto 0.8rem;
-      border-radius: 50%;
+    /* Council Circle Layout */
+    .council-stage {
+      position: relative;
+      width: 100%;
+      max-width: 500px;
+      height: 400px;
+      margin: 0 auto 1.5rem;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 2.5rem;
-      position: relative;
-      border: 3px solid var(--border-color);
     }
 
-    .intuition-avatar {
-      background: linear-gradient(135deg, var(--intuition-color), #3b82f6);
-    }
-
-    .reason-avatar {
-      background: linear-gradient(135deg, var(--reason-color), #8b5cf6);
-    }
-
-    .fear-avatar {
-      background: linear-gradient(135deg, var(--fear-color), #f59e0b);
-    }
-
-    .speaking-indicator {
+    /* Center area for active speaker */
+    .center-spotlight {
       position: absolute;
-      top: -5px;
-      right: -5px;
-      width: 18px;
-      height: 18px;
-      background: #10b981;
+      width: 180px;
+      height: 180px;
       border-radius: 50%;
-      border: 3px solid var(--bg-card);
-      opacity: 0;
-      transition: opacity 0.25s;
+      background: rgba(30, 41, 59, 0.8);
+      border: 2px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.5s ease;
+      z-index: 10;
     }
 
-    .voice-card.speaking .speaking-indicator {
-      opacity: 1;
+    .center-spotlight.active {
+      transform: scale(1.1);
     }
 
-    .voice-name {
+    .center-spotlight.intuition {
+      border-color: var(--intuition-color);
+      box-shadow: 0 0 60px var(--intuition-glow), 0 0 100px var(--intuition-glow);
+    }
+
+    .center-spotlight.reason {
+      border-color: var(--reason-color);
+      box-shadow: 0 0 60px var(--reason-glow), 0 0 100px var(--reason-glow);
+    }
+
+    .center-spotlight.fear {
+      border-color: var(--fear-color);
+      box-shadow: 0 0 60px var(--fear-glow), 0 0 100px var(--fear-glow);
+    }
+
+    .center-spotlight.user {
+      border-color: #10b981;
+      box-shadow: 0 0 60px rgba(16, 185, 129, 0.4), 0 0 100px rgba(16, 185, 129, 0.3);
+    }
+
+    .center-icon {
+      font-size: 3rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .center-label {
       font-size: 1.1rem;
       font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
     }
 
-    .voice-role {
-      font-size: 0.85rem;
+    .center-status {
+      font-size: 0.8rem;
       color: var(--text-secondary);
+      margin-top: 0.3rem;
     }
 
-    .dialogue-card {
+    /* Persona orbs positioned around the center */
+    .persona-orb {
+      position: absolute;
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border: 3px solid var(--border-color);
+      background: var(--bg-card);
+      transition: all 0.4s ease;
+      cursor: default;
+      opacity: 0.6;
+    }
+
+    .persona-orb.active {
+      opacity: 1;
+      transform: scale(1.15);
+    }
+
+    .persona-orb.intuition {
+      top: 10%;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+    .persona-orb.intuition.active {
+      border-color: var(--intuition-color);
+      box-shadow: 0 0 30px var(--intuition-glow);
+      transform: translateX(-50%) scale(1.15);
+    }
+
+    .persona-orb.reason {
+      bottom: 15%;
+      left: 10%;
+    }
+    .persona-orb.reason.active {
+      border-color: var(--reason-color);
+      box-shadow: 0 0 30px var(--reason-glow);
+    }
+
+    .persona-orb.fear {
+      bottom: 15%;
+      right: 10%;
+    }
+    .persona-orb.fear.active {
+      border-color: var(--fear-color);
+      box-shadow: 0 0 30px var(--fear-glow);
+    }
+
+    .orb-icon {
+      font-size: 1.8rem;
+    }
+
+    .orb-name {
+      font-size: 0.7rem;
+      font-weight: 600;
+      margin-top: 0.2rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    /* Captions Area */
+    .captions-area {
+      flex: 1;
       background: var(--bg-card);
       border-radius: 1rem;
-      padding: 1.5rem;
       border: 1px solid var(--border-color);
-      min-height: 280px;
-      max-height: 520px;
-      overflow-y: auto;
-    }
-
-    .dialogue-message {
-      margin-bottom: 1.1rem;
       padding: 1rem;
-      border-radius: 0.75rem;
-      border-left: 4px solid;
-      opacity: 0;
-      animation: fadeInUp 0.4s ease-out forwards;
+      margin-bottom: 1rem;
+      overflow-y: auto;
+      max-height: 250px;
+      min-height: 150px;
     }
 
-    .dialogue-message.Intuition {
-      background: linear-gradient(
-        135deg,
-        rgba(96, 165, 250, 0.12),
-        rgba(59, 130, 246, 0.06)
-      );
-      border-left-color: var(--intuition-color);
+    .caption-entry {
+      margin-bottom: 0.8rem;
+      padding: 0.8rem;
+      border-radius: 0.5rem;
+      animation: fadeIn 0.3s ease;
     }
 
-    .dialogue-message.Reason {
-      background: linear-gradient(
-        135deg,
-        rgba(167, 139, 250, 0.12),
-        rgba(139, 92, 246, 0.06)
-      );
-      border-left-color: var(--reason-color);
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(5px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
-    .dialogue-message.Fear {
-      background: linear-gradient(
-        135deg,
-        rgba(251, 191, 36, 0.14),
-        rgba(245, 158, 11, 0.08)
-      );
-      border-left-color: var(--fear-color);
+    .caption-entry.intuition {
+      background: rgba(96, 165, 250, 0.1);
+      border-left: 3px solid var(--intuition-color);
     }
 
-    @keyframes fadeInUp {
-      from {
-        transform: translateY(8px);
-        opacity: 0;
-      }
-      to {
-        transform: translateY(0);
-        opacity: 1;
-      }
+    .caption-entry.reason {
+      background: rgba(167, 139, 250, 0.1);
+      border-left: 3px solid var(--reason-color);
     }
 
-    .message-header {
+    .caption-entry.fear {
+      background: rgba(251, 191, 36, 0.1);
+      border-left: 3px solid var(--fear-color);
+    }
+
+    .caption-entry.user {
+      background: rgba(16, 185, 129, 0.1);
+      border-left: 3px solid #10b981;
+    }
+
+    .caption-speaker {
+      font-size: 0.75rem;
       font-weight: 600;
-      margin-bottom: 0.4rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.3rem;
+      opacity: 0.8;
     }
 
-    .message-text {
-      font-size: 0.96rem;
+    .caption-entry.intuition .caption-speaker { color: var(--intuition-color); }
+    .caption-entry.reason .caption-speaker { color: var(--reason-color); }
+    .caption-entry.fear .caption-speaker { color: var(--fear-color); }
+    .caption-entry.user .caption-speaker { color: #10b981; }
+
+    .caption-text {
+      font-size: 0.95rem;
+      line-height: 1.5;
     }
 
-    .playback-row {
-      margin-top: 1rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-    }
-
-    .pill {
-      padding: 0.18rem 0.6rem;
-      border-radius: 999px;
-      background: rgba(15, 23, 42, 0.8);
-      border: 1px solid var(--border-color);
-      font-size: 0.78rem;
-      color: var(--text-secondary);
-    }
-
-    .footer {
-      margin-top: 2.5rem;
+    .caption-placeholder {
       text-align: center;
       color: var(--text-secondary);
-      font-size: 0.8rem;
+      padding: 2rem;
+      font-style: italic;
     }
 
-    @media (max-width: 768px) {
-      .title {
-        font-size: 2.1rem;
-      }
-      .dialogue-card {
-        min-height: 240px;
-      }
+    /* Controls */
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      padding: 1rem 0;
+    }
+
+    .control-btn {
+      padding: 1rem 2rem;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.3s ease;
+    }
+
+    .start-btn {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: white;
+      box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+    }
+
+    .start-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+    }
+
+    .start-btn.active {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+    }
+
+    .start-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Pulsing animation for listening state */
+    @keyframes pulse-ring {
+      0% { transform: scale(1); opacity: 1; }
+      100% { transform: scale(1.5); opacity: 0; }
+    }
+
+    .pulse-ring {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      border: 2px solid currentColor;
+      animation: pulse-ring 1.5s infinite;
+    }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      padding: 0.5rem 0;
+    }
+
+    /* Responsive */
+    @media (max-width: 600px) {
+      .title { font-size: 1.8rem; }
+      .council-stage { height: 320px; }
+      .center-spotlight { width: 140px; height: 140px; }
+      .center-icon { font-size: 2.5rem; }
+      .persona-orb { width: 70px; height: 70px; }
+      .orb-icon { font-size: 1.4rem; }
+      .captions-area { max-height: 200px; }
     }
   </style>
 </head>
@@ -345,84 +356,61 @@
   <div class="container">
     <header class="header">
       <h1 class="title">The Inner Council</h1>
-      <p class="subtitle">
-        Three inner voices – Intuition, Reason, and Fear – debate your challenge while you listen.
-      </p>
+      <p class="subtitle">Three voices within you: Intuition, Reason, and Fear</p>
     </header>
 
-    <section class="input-section">
-      <div class="input-card">
-        <label for="challengeInput" class="input-label">
-          What challenge are you facing right now?
-        </label>
-        <textarea
-          id="challengeInput"
-          class="challenge-input"
-          placeholder="E.g., I'm considering leaving my stable job for something more meaningful but I'm scared about money and regret."
-        ></textarea>
+    <!-- Council Stage with Circular Layout -->
+    <section class="council-stage">
+      <!-- Center spotlight for active speaker -->
+      <div id="centerSpotlight" class="center-spotlight">
+        <span id="centerIcon" class="center-icon">🎭</span>
+        <span id="centerLabel" class="center-label">Ready</span>
+        <span id="centerStatus" class="center-status">Click below to begin</span>
+      </div>
 
-        <div class="buttons-row">
-          <button id="startButton" class="primary-btn">
-            <span class="button-text">Let the Inner Council speak</span>
-          </button>
-          <button id="micButton" class="secondary-btn">
-            🎙️ Speak instead of typing
-          </button>
-          <span class="demo-note">Leave blank for a generic demo scenario.</span>
-        </div>
+      <!-- Persona orbs around the circle -->
+      <div class="persona-orb intuition" data-persona="intuition">
+        <span class="orb-icon">💙</span>
+        <span class="orb-name">Intuition</span>
+      </div>
+
+      <div class="persona-orb reason" data-persona="reason">
+        <span class="orb-icon">🧠</span>
+        <span class="orb-name">Reason</span>
+      </div>
+
+      <div class="persona-orb fear" data-persona="fear">
+        <span class="orb-icon">🛡️</span>
+        <span class="orb-name">Fear</span>
       </div>
     </section>
 
-    <section id="councilSection" style="display:none;">
-      <div class="council-members">
-        <div class="voice-card" data-voice="Intuition">
-          <div class="voice-avatar intuition-avatar">
-            <div class="speaking-indicator"></div>
-            <span>💙</span>
-          </div>
-          <div class="voice-name">Intuition</div>
-          <div class="voice-role">Expands possibilities</div>
-        </div>
-
-        <div class="voice-card" data-voice="Reason">
-          <div class="voice-avatar reason-avatar">
-            <div class="speaking-indicator"></div>
-            <span>🧠</span>
-          </div>
-          <div class="voice-name">Reason</div>
-          <div class="voice-role">Grounds decisions</div>
-        </div>
-
-        <div class="voice-card" data-voice="Fear">
-          <div class="voice-avatar fear-avatar">
-            <div class="speaking-indicator"></div>
-            <span>🛡️</span>
-          </div>
-          <div class="voice-name">Fear</div>
-          <div class="voice-role">Protects from danger</div>
-        </div>
+    <!-- Live Captions -->
+    <section class="captions-area" id="captionsArea">
+      <div class="caption-placeholder" id="captionPlaceholder">
+        Conversation transcript will appear here...
       </div>
     </section>
 
-    <section id="dialogueSection" style="display:none;">
-      <div class="dialogue-card" id="dialogueContainer"></div>
-      <div class="playback-row">
-        <button id="playAllButton" class="secondary-btn">
-          🔊 Play full debate
-        </button>
-        <span class="pill">
-          Line <span id="currentLine">0</span> / <span id="totalLines">0</span>
-        </span>
-      </div>
+    <!-- Controls -->
+    <section class="controls">
+      <button id="startBtn" class="control-btn start-btn">
+        🎤 Start Conversation
+      </button>
     </section>
 
     <footer class="footer">
-      Built for experimentation • Backed by local LLM + optional ElevenLabs
+      Built for ElevenLabs Hackathon 2024
     </footer>
-
-    <audio id="audioPlayer" style="display:none;"></audio>
   </div>
 
-  <script src="script.js"></script>
+  <!-- ElevenLabs Conversational SDK -->
+  <script type="module">
+    import { Conversation } from 'https://cdn.jsdelivr.net/npm/@11labs/client@0.0.5/+esm';
+    window.ElevenLabsConversation = Conversation;
+    console.log('ElevenLabs SDK loaded');
+  </script>
+
+  <script src="/static/script.js"></script>
 </body>
 </html>
